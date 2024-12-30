@@ -30,12 +30,26 @@ pub fn main() !void {
 
         switch (g.current_player) {
             .X => {
-                input = try request_move(stdin, stdout);
-                try g.place_move(input);
+                while (true) {
+                    input = request_move(stdin, stdout) catch |err| {
+                        std.debug.print("Bad move type: {}\n", .{err});
+                        continue;
+                    };
+
+                    g.place_move(input) catch |err| {
+                        std.debug.print("Invalid move: {}\n", .{err});
+                        continue;
+                    };
+
+                    break;
+                }
             },
             .O => {
                 const result = minimax(&g);
-                try g.place_move(result[0]);
+                g.place_move(result[0]) catch |err| {
+                    std.debug.print("AI requested invalid move! Err: {}\n", .{err});
+                    return;
+                };
             },
             else => {},
         }
