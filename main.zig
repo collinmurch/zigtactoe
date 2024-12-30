@@ -54,7 +54,7 @@ fn request_move(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !usize {
     return 0;
 }
 
-fn minimax(g: *const game.Game) struct { usize, i32 } {
+fn minimax(g: *game.Game) struct { usize, i32 } {
     switch (g.check_winner()) {
         .X => return .{ 0, 10 },
         .O => return .{ 0, -10 },
@@ -66,17 +66,21 @@ fn minimax(g: *const game.Game) struct { usize, i32 } {
 
     var scores: [9]i32 = undefined;
     for (choices, 0..) |move, i| {
-        var gameCopy = g.*;
-        gameCopy.place_move(move) catch |err| {
+        g.place_move(move) catch |err| {
             std.debug.print("Unexpected error placing open AI move: {}\n", .{err});
             return .{ 0, 0 };
         };
 
-        const result = minimax(&gameCopy);
+        const result = minimax(g);
         scores[i] = result[1];
+
+        g.undo_move(move) catch |err| {
+            std.debug.print("Unexpected error undoing open AI move: {}\n", .{err});
+            return .{ 0, 0 };
+        };
     }
 
-    var bestScore: i32 = if (g.current_player == .X) -10000 else 10000;
+    var bestScore: i32 = if (g.current_player == .X) -1_000_000 else 1_000_000;
     var bestMove: usize = 0;
     for (scores[0..choices.len], 0..) |score, i| {
         if (g.current_player == .X) {

@@ -104,7 +104,7 @@ pub const Game = struct {
     }
 
     pub fn place_move(self: *Game, index: usize) GameError!void {
-        if (index >= 9) return GameError.InvalidMove;
+        if (index > 8) return GameError.InvalidMove;
 
         const y = index / 3;
         const x = index % 3;
@@ -112,6 +112,20 @@ pub const Game = struct {
         if (self.board[y][x] != .Empty) return GameError.CellOccupied;
 
         self.board[y][x] = self.current_player;
+        self.current_player = switch (self.current_player) {
+            .X => .O,
+            .O => .X,
+            else => .Empty,
+        };
+    }
+
+    pub fn undo_move(self: *Game, index: usize) GameError!void {
+        if (index > 8) return GameError.InvalidMove;
+
+        const y = index / 3;
+        const x = index % 3;
+
+        self.board[y][x] = .Empty;
         self.current_player = switch (self.current_player) {
             .X => .O,
             .O => .X,
