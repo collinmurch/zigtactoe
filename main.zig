@@ -10,41 +10,36 @@ pub fn main() !void {
 
     var input: usize = undefined;
     while (true) {
-        try g.printBoard(stdout);
-        if (check_end(&g, stdout)) return;
+        try g.print_board(stdout);
+        switch (g.check_winner()) {
+            .X => {
+                try stdout.writeAll("X wins!\n");
+                return;
+            },
+            .O => {
+                try stdout.writeAll("O wins!\n");
+                return;
+            },
+            .Empty => {
+                if (g.is_draw()) {
+                    try stdout.writeAll("It's a draw!\n");
+                    return;
+                }
+            },
+        }
 
-        // Player
-        input = try requestMove(stdin, stdout);
-        try g.placeMove(input);
-
-        if (check_end(&g, stdout)) return;
-
-        // AI
-        const result = minimax(&g, 0);
-        try stdout.print("Move: {d}, Score: {d}\n", .{ result[0] + 1, result[1] });
-        try g.placeMove(result[0]);
+        switch (g.current_player) {
+            .X => {
+                input = try requestMove(stdin, stdout);
+                try g.place_move(input);
+            },
+            .O => {
+                const result = minimax(&g);
+                try g.place_move(result[0]);
+            },
+            else => {},
+        }
     }
-}
-
-fn check_end(g: *const game.Game, writer: std.fs.File.Writer) bool {
-    switch (g.checkWinner()) {
-        .X => {
-            writer.writeAll("X wins!\n") catch unreachable;
-            return true;
-        },
-        .O => {
-            writer.writeAll("O wins!\n") catch unreachable;
-            return true;
-        },
-        .Empty => {
-            if (g.isDraw()) {
-                writer.writeAll("It's a draw!\n") catch unreachable;
-                return true;
-            }
-        },
-    }
-
-    return false;
 }
 
 fn requestMove(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !usize {
@@ -59,29 +54,28 @@ fn requestMove(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !usize {
     return 0;
 }
 
-fn minimax(g: *const game.Game, depth: usize) struct { usize, i32 } {
-    switch (g.checkWinner()) {
+fn minimax(g: *const game.Game) struct { usize, i32 } {
+    switch (g.check_winner()) {
         .X => return .{ 0, 10 },
         .O => return .{ 0, -10 },
-        .Empty => if (g.isDraw()) return .{ 0, 0 },
+        .Empty => if (g.is_draw()) return .{ 0, 0 },
     }
 
-    const choices = g.getOpenSpots() catch unreachable;
+    const choices = g.get_open_spots() catch unreachable;
     defer std.heap.page_allocator.free(choices);
 
     var scores: [9]i32 = undefined;
     for (choices, 0..) |move, i| {
-        if (depth == 0) std.debug.print("Choice: {}\n", .{move});
         var gameCopy = g.*;
-        gameCopy.placeMove(move) catch unreachable;
-        const result = minimax(&gameCopy, depth + 1);
+        gameCopy.place_move(move) catch unreachable;
+        const result = minimax(&gameCopy);
         scores[i] = result[1];
     }
 
-    var bestScore: i32 = if (g.currentPlayer == .X) -10000 else 10000;
+    var bestScore: i32 = if (g.current_player == .X) -10000 else 10000;
     var bestMove: usize = 0;
     for (scores[0..choices.len], 0..) |score, i| {
-        if (g.currentPlayer == .X) {
+        if (g.current_player == .X) {
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = choices[i];

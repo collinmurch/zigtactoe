@@ -13,7 +13,7 @@ pub const GameError = error{
 
 pub const Game = struct {
     board: [3][3]Player,
-    currentPlayer: Player,
+    current_player: Player,
 
     pub fn init(player: Player) Game {
         return Game{
@@ -22,11 +22,11 @@ pub const Game = struct {
                 [_]Player{.Empty} ** 3,
                 [_]Player{.Empty} ** 3,
             },
-            .currentPlayer = player,
+            .current_player = player,
         };
     }
 
-    pub fn printBoard(self: *const Game, writer: std.fs.File.Writer) !void {
+    pub fn print_board(self: *const Game, writer: std.fs.File.Writer) !void {
         try writer.writeAll("-----\n");
 
         for (self.board) |row| {
@@ -45,7 +45,7 @@ pub const Game = struct {
         try writer.writeAll("-----\n");
     }
 
-    pub fn getOpenSpots(self: *const Game) ![]const usize {
+    pub fn get_open_spots(self: *const Game) ![]const usize {
         var open_spots = std.ArrayList(usize).init(std.heap.page_allocator);
         defer open_spots.deinit();
 
@@ -62,7 +62,7 @@ pub const Game = struct {
         return open_spots.toOwnedSlice();
     }
 
-    pub fn checkWinner(self: *const Game) Player {
+    pub fn check_winner(self: *const Game) Player {
         for ([_]Player{ .X, .O }) |player| {
             for (self.board) |row| {
                 if (row[0] == player and row[1] == player and row[2] == player) {
@@ -87,7 +87,7 @@ pub const Game = struct {
         return .Empty;
     }
 
-    pub fn isDraw(self: *const Game) bool {
+    pub fn is_draw(self: *const Game) bool {
         for (0..3) |y| {
             for (0..3) |x| {
                 if (self.board[y][x] == .Empty) return false;
@@ -97,7 +97,7 @@ pub const Game = struct {
         return true;
     }
 
-    pub fn placeMove(self: *Game, index: usize) GameError!void {
+    pub fn place_move(self: *Game, index: usize) GameError!void {
         if (index >= 9) return GameError.InvalidMove;
 
         const y = index / 3;
@@ -105,8 +105,8 @@ pub const Game = struct {
 
         if (self.board[y][x] != .Empty) return GameError.CellOccupied;
 
-        self.board[y][x] = self.currentPlayer;
-        self.currentPlayer = switch (self.currentPlayer) {
+        self.board[y][x] = self.current_player;
+        self.current_player = switch (self.current_player) {
             .Empty => .X,
             .X => .O,
             .O => .X,
