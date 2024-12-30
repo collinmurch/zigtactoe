@@ -13,7 +13,7 @@ pub const GameError = error{
 
 pub const Game = struct {
     board: [3][3]Player,
-    current_player: Player,
+    currentPlayer: Player,
 
     pub fn init(player: Player) Game {
         return Game{
@@ -22,14 +22,8 @@ pub const Game = struct {
                 [_]Player{.Empty} ** 3,
                 [_]Player{.Empty} ** 3,
             },
-            .current_player = player,
+            .currentPlayer = player,
         };
-    }
-
-    pub fn playerMove(self: *Game, move: usize) !void {
-        const x = move % 3;
-        const y = move / 3;
-        try self.placeMove(x, y);
     }
 
     pub fn printBoard(self: *const Game, writer: std.fs.File.Writer) !void {
@@ -51,53 +45,68 @@ pub const Game = struct {
         try writer.writeAll("-----\n");
     }
 
-    pub fn isWinner(self: *const Game, player: Player) bool {
-        for (self.board) |row| {
-            if (row[0] == player and row[1] == player and row[2] == player) {
-                return true;
+    pub fn getOpenSpots(self: *const Game) ![]const usize {
+        var open_spots = std.ArrayList(usize).init(std.heap.page_allocator);
+        defer open_spots.deinit();
+
+        var count: usize = 0;
+        for (self.board, 0..) |row, y| {
+            for (row, 0..) |cell, x| {
+                if (cell == .Empty) {
+                    open_spots.append(y * 3 + x) catch unreachable;
+                    count += 1;
+                }
             }
         }
 
-        for (0..3) |i| {
-            if (self.board[0][i] == player and self.board[1][i] == player and self.board[2][i] == player) {
-                return true;
+        return open_spots.toOwnedSlice();
+    }
+
+    pub fn checkWinner(self: *const Game) Player {
+        for ([_]Player{ .X, .O }) |player| {
+            for (self.board) |row| {
+                if (row[0] == player and row[1] == player and row[2] == player) {
+                    return player;
+                }
+            }
+
+            for (0..3) |i| {
+                if (self.board[0][i] == player and self.board[1][i] == player and self.board[2][i] == player) {
+                    return player;
+                }
+            }
+
+            if (self.board[0][0] == player and self.board[1][1] == player and self.board[2][2] == player) {
+                return player;
+            }
+            if (self.board[0][2] == player and self.board[1][1] == player and self.board[2][0] == player) {
+                return player;
             }
         }
 
-        if (self.board[0][0] == player and self.board[1][1] == player and self.board[2][2] == player) {
-            return true;
-        }
-
-        if (self.board[0][2] == player and self.board[1][1] == player and self.board[2][0] == player) {
-            return true;
-        }
-
-        return false;
+        return .Empty;
     }
 
     pub fn isDraw(self: *const Game) bool {
         for (0..3) |y| {
             for (0..3) |x| {
-                if (self.board[y][x] == .Empty) {
-                    return false;
-                }
+                if (self.board[y][x] == .Empty) return false;
             }
         }
 
         return true;
     }
 
-    fn placeMove(self: *Game, x: usize, y: usize) GameError!void {
-        if (x >= 3 or y >= 3) {
-            return GameError.InvalidMove;
-        }
+    pub fn placeMove(self: *Game, index: usize) GameError!void {
+        if (index >= 9) return GameError.InvalidMove;
 
-        if (self.board[y][x] != .Empty) {
-            return GameError.CellOccupied;
-        }
+        const y = index / 3;
+        const x = index % 3;
 
-        self.board[y][x] = self.current_player;
-        self.current_player = switch (self.current_player) {
+        if (self.board[y][x] != .Empty) return GameError.CellOccupied;
+
+        self.board[y][x] = self.currentPlayer;
+        self.currentPlayer = switch (self.currentPlayer) {
             .Empty => .X,
             .X => .O,
             .O => .X,
