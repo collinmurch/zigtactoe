@@ -30,7 +30,7 @@ pub fn main() !void {
 
         switch (g.current_player) {
             .X => {
-                input = try requestMove(stdin, stdout);
+                input = try request_move(stdin, stdout);
                 try g.place_move(input);
             },
             .O => {
@@ -42,7 +42,7 @@ pub fn main() !void {
     }
 }
 
-fn requestMove(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !usize {
+fn request_move(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !usize {
     var buf: [10]u8 = undefined;
 
     try writer.writeAll("Enter a move [1-9]: ");
@@ -61,13 +61,17 @@ fn minimax(g: *const game.Game) struct { usize, i32 } {
         .Empty => if (g.is_draw()) return .{ 0, 0 },
     }
 
-    const choices = g.get_open_spots() catch unreachable;
+    const choices = g.get_open_spots();
     defer std.heap.page_allocator.free(choices);
 
     var scores: [9]i32 = undefined;
     for (choices, 0..) |move, i| {
         var gameCopy = g.*;
-        gameCopy.place_move(move) catch unreachable;
+        gameCopy.place_move(move) catch |err| {
+            std.debug.print("Unexpected error placing open AI move: {}\n", .{err});
+            return .{ 0, 0 };
+        };
+
         const result = minimax(&gameCopy);
         scores[i] = result[1];
     }

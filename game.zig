@@ -45,7 +45,7 @@ pub const Game = struct {
         try writer.writeAll("-----\n");
     }
 
-    pub fn get_open_spots(self: *const Game) ![]const usize {
+    pub fn get_open_spots(self: *const Game) []const usize {
         var open_spots = std.ArrayList(usize).init(std.heap.page_allocator);
         defer open_spots.deinit();
 
@@ -53,13 +53,19 @@ pub const Game = struct {
         for (self.board, 0..) |row, y| {
             for (row, 0..) |cell, x| {
                 if (cell == .Empty) {
-                    open_spots.append(y * 3 + x) catch unreachable;
+                    open_spots.append(y * 3 + x) catch |err| {
+                        std.debug.print("Unexpected error appending open spots: {}\n", .{err});
+                        return &[_]usize{};
+                    };
                     count += 1;
                 }
             }
         }
 
-        return open_spots.toOwnedSlice();
+        return open_spots.toOwnedSlice() catch |err| {
+            std.debug.print("Unexpected error returning open spots: {}\n", .{err});
+            return &[_]usize{};
+        };
     }
 
     pub fn check_winner(self: *const Game) Player {
@@ -107,9 +113,9 @@ pub const Game = struct {
 
         self.board[y][x] = self.current_player;
         self.current_player = switch (self.current_player) {
-            .Empty => .X,
             .X => .O,
             .O => .X,
+            else => .Empty,
         };
     }
 };
