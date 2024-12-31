@@ -8,7 +8,6 @@ pub fn main() !void {
     var g = game.Game.init(.X);
     try stdout.writeAll("You play as X.\n");
 
-    var input: usize = undefined;
     while (true) {
         try g.print_board(stdout);
         switch (g.check_winner()) {
@@ -31,7 +30,7 @@ pub fn main() !void {
         switch (g.current_player) {
             .X => {
                 while (true) {
-                    input = request_move(stdin, stdout) catch |err| {
+                    const input = request_move(stdin, stdout) catch |err| {
                         std.debug.print("Bad move type: {}\n", .{err});
                         continue;
                     };
@@ -45,7 +44,7 @@ pub fn main() !void {
                 }
             },
             .O => {
-                const result = minimax(&g);
+                const result = alphabeta(&g, -1_000_000, 1_000_000);
                 g.place_move(result[0]) catch |err| {
                     std.debug.print("AI requested invalid move! Err: {}\n", .{err});
                     return;
@@ -68,44 +67,59 @@ fn request_move(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !usize {
     return 0;
 }
 
-fn minimax(g: *game.Game) struct { usize, i32 } {
+fn alphabeta(g: *game.Game, alpha_in: i32, beta_in: i32) struct { usize, i32 } {
     switch (g.check_winner()) {
         .X => return .{ 0, 10 },
         .O => return .{ 0, -10 },
         .Empty => if (g.is_draw()) return .{ 0, 0 },
     }
 
+    var alpha = alpha_in;
+    var beta = beta_in;
+
     const choices = g.get_open_spots();
     defer std.heap.page_allocator.free(choices);
 
-    var scores: [9]i32 = undefined;
-    for (choices, 0..) |move, i| {
-        g.place_move(move) catch |err| {
+    var bestMove: usize = 0;
+    var bestScore: i32 = if (g.current_player == .X) -1_000_000 else 1_000_000;
+    for (choices) |choice| {
+        g.place_move(choice) catch |err| {
             std.debug.print("Unexpected error placing open AI move: {}\n", .{err});
             return .{ 0, 0 };
         };
 
-        const result = minimax(g);
-        scores[i] = result[1];
+        _, const score = alphabeta(g, alpha, beta);
 
-        g.undo_move(move) catch |err| {
+        g.undo_move(choice) catch |err| {
             std.debug.print("Unexpected error undoing open AI move: {}\n", .{err});
             return .{ 0, 0 };
         };
-    }
 
-    var bestScore: i32 = if (g.current_player == .X) -1_000_000 else 1_000_000;
-    var bestMove: usize = 0;
-    for (scores[0..choices.len], 0..) |score, i| {
         if (g.current_player == .X) {
             if (score > bestScore) {
                 bestScore = score;
-                bestMove = choices[i];
+                bestMove = choice;
             }
-        } else {
+
+            if (bestScore > beta) {
+                break; // Prune
+            }
+
+            if (bestScore > alpha) {
+                alpha = bestScore;
+            }
+        } else if (g.current_player == .O) {
             if (score < bestScore) {
                 bestScore = score;
-                bestMove = choices[i];
+                bestMove = choice;
+            }
+
+            if (bestScore < alpha) {
+                break; // Prune
+            }
+
+            if (bestScore < beta) {
+                beta = bestScore;
             }
         }
     }
