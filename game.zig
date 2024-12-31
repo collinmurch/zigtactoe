@@ -15,8 +15,14 @@ pub const Game = struct {
     board: [3][3]Player,
     current_player: Player,
 
-    pub fn init(player: Player) Game {
+    reader: std.fs.File.Reader,
+    writer: std.fs.File.Writer,
+
+    pub fn init(reader: std.fs.File.Reader, writer: std.fs.File.Writer, player: Player) Game {
         return Game{
+            .reader = reader,
+            .writer = writer,
+
             .board = [3][3]Player{
                 [_]Player{.Empty} ** 3,
                 [_]Player{.Empty} ** 3,
@@ -26,23 +32,33 @@ pub const Game = struct {
         };
     }
 
-    pub fn print_board(self: *const Game, writer: std.fs.File.Writer) !void {
-        try writer.writeAll("-----\n");
+    pub fn print_board(self: *const Game) void {
+        self.writer.writeAll("-----\n") catch unreachable;
 
         for (self.board) |row| {
             for (row) |cell| {
-                try writer.print("{s} ", .{
+                self.writer.print("{s} ", .{
                     switch (cell) {
                         .Empty => ".",
                         .X => "X",
                         .O => "O",
                     },
-                });
+                }) catch unreachable;
             }
-            try writer.print("\n", .{});
+            self.writer.print("\n", .{}) catch unreachable;
         }
 
-        try writer.writeAll("-----\n");
+        self.writer.writeAll("-----\n") catch unreachable;
+    }
+
+    pub fn player_move(self: *Game) !void {
+        var buf: [10]u8 = undefined;
+
+        try self.writer.writeAll("Enter a move [1-9]: ");
+        if (try self.reader.readUntilDelimiterOrEof(buf[0..], '\n')) |user_input| {
+            const move = try std.fmt.parseInt(usize, user_input, 10);
+            try self.place_move(move - 1);
+        }
     }
 
     pub fn get_open_spots(self: *const Game) []const usize {

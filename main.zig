@@ -2,14 +2,14 @@ const std = @import("std");
 const game = @import("game.zig");
 
 pub fn main() !void {
-    const stdout = std.io.getStdOut().writer();
     const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
 
-    var g = game.Game.init(.X);
+    var g = game.Game.init(stdin, stdout, .X);
     try stdout.writeAll("You play as X.\n");
 
     while (true) {
-        try g.print_board(stdout);
+        g.print_board();
         switch (g.check_winner()) {
             .X => {
                 try stdout.writeAll("X wins!\n");
@@ -27,44 +27,22 @@ pub fn main() !void {
             },
         }
 
-        switch (g.current_player) {
-            .X => {
-                while (true) {
-                    const input = request_move(stdin, stdout) catch |err| {
-                        std.debug.print("Bad move type: {}\n", .{err});
-                        continue;
-                    };
-
-                    g.place_move(input) catch |err| {
-                        std.debug.print("Invalid move: {}\n", .{err});
-                        continue;
-                    };
-
-                    break;
-                }
-            },
-            .O => {
-                const result = alphabeta(&g, -1_000_000, 1_000_000);
-                g.place_move(result[0]) catch |err| {
-                    std.debug.print("AI requested invalid move! Err: {}\n", .{err});
-                    return;
+        if (g.current_player == .X) {
+            while (true) {
+                g.player_move() catch |err| {
+                    std.debug.print("Invalid move: {}\n", .{err});
+                    continue;
                 };
-            },
-            else => {},
+                break;
+            }
+        } else if (g.current_player == .O) {
+            const choice, _ = alphabeta(&g, -1_000_000, 1_000_000);
+            g.place_move(choice) catch |err| {
+                std.debug.print("AI requested invalid move: {}\n", .{err});
+                return;
+            };
         }
     }
-}
-
-fn request_move(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !usize {
-    var buf: [10]u8 = undefined;
-
-    try writer.writeAll("Enter a move [1-9]: ");
-    if (try reader.readUntilDelimiterOrEof(buf[0..], '\n')) |user_input| {
-        const move = try std.fmt.parseInt(usize, user_input, 10);
-        return move - 1;
-    }
-
-    return 0;
 }
 
 fn alphabeta(g: *game.Game, alpha_in: i32, beta_in: i32) struct { usize, i32 } {
@@ -84,14 +62,14 @@ fn alphabeta(g: *game.Game, alpha_in: i32, beta_in: i32) struct { usize, i32 } {
     var bestScore: i32 = if (g.current_player == .X) -1_000_000 else 1_000_000;
     for (choices) |choice| {
         g.place_move(choice) catch |err| {
-            std.debug.print("Unexpected error placing open AI move: {}\n", .{err});
+            std.debug.print("Unexpected error placing AI move: {}\n", .{err});
             return .{ 0, 0 };
         };
 
         _, const score = alphabeta(g, alpha, beta);
 
         g.undo_move(choice) catch |err| {
-            std.debug.print("Unexpected error undoing open AI move: {}\n", .{err});
+            std.debug.print("Unexpected error undoing AI move: {}\n", .{err});
             return .{ 0, 0 };
         };
 
@@ -101,26 +79,16 @@ fn alphabeta(g: *game.Game, alpha_in: i32, beta_in: i32) struct { usize, i32 } {
                 bestMove = choice;
             }
 
-            if (bestScore > beta) {
-                break; // Prune
-            }
-
-            if (bestScore > alpha) {
-                alpha = bestScore;
-            }
+            if (bestScore > beta) break; // Prune
+            if (bestScore > alpha) alpha = bestScore;
         } else if (g.current_player == .O) {
             if (score < bestScore) {
                 bestScore = score;
                 bestMove = choice;
             }
 
-            if (bestScore < alpha) {
-                break; // Prune
-            }
-
-            if (bestScore < beta) {
-                beta = bestScore;
-            }
+            if (bestScore < alpha) break; // Prune
+            if (bestScore < beta) beta = bestScore;
         }
     }
 
